@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  SUCCESS
+  FAILED
+  REFUND_PENDING
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SETTLEMENT
+  CAPTURE
+  DENY
+  EXPIRE
+  CANCEL
+  REFUND
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  supplierCode    String   @unique
+  gameCode        String
+  name            String
+  description     String?
+  supplierPrice   Int
+  marginAmount    Int      @default(0)
+  sellPrice       Int
+  isActive        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  orders          Order[]
+  @@index([gameCode, isActive])
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  orderNumber       String      @unique
+  productId         String
+  product           Product     @relation(fields: [productId], references: [id])
+  buyerEmail        String?
+  gameUserId        String
+  gameZoneId        String?
+  amount            Int
+  status            OrderStatus @default(PENDING_PAYMENT)
+  supplierReference String?     @unique
+  supplierResponse  Json?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  payment           Payment?
+  @@index([status, createdAt])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  order             Order         @relation(fields: [orderId], references: [id])
+  provider           String        @default("MIDTRANS")
+  providerOrderId    String        @unique
+  transactionId      String?       @unique
+  status             PaymentStatus @default(PENDING)
+  grossAmount        Int
+  paymentType        String?
+  rawNotification    Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model WebhookEvent {
+  id          String   @id @default(cuid())
+  provider    String
+  eventKey    String   @unique
+  payload     Json
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      String
+  action     String
+  entityType String
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  @@index([entityType, entityId, createdAt])
+}
